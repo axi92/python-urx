@@ -154,7 +154,7 @@ class Robotiq_Two_Finger_Gripper(object):
         self.socket_host = socket_host
         self.socket_port = socket_port
         self.socket_name = socket_name
-        self.logger = logging.getLogger(u"robotiq")
+        self.logger = logging.getLogger("robotiq")
 
     def _get_new_urscript(self):
         """
