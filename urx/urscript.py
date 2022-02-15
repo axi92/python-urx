@@ -27,7 +27,7 @@ OUTPUT_DOMAIN_VOLTAGE = [
 class URScript(object):
 
     def __init__(self):
-        self.logger = logging.getLogger(u"urscript")
+        self.logger = logging.getLogger("urscript")
         # The header is code that is before and outside the myProg() method
         self.header = ""
         # The program is code inside the myProg() method
@@ -35,7 +35,7 @@ class URScript(object):
 
     def __call__(self):
         if(self.program == ""):
-            self.logger.debug(u"urscript program is empty")
+            self.logger.debug("urscript program is empty")
             return ""
 
         # Construct the program

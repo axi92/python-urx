@@ -31,9 +31,10 @@ class URRobot(object):
     Rmq: A program sent to the robot i executed immendiatly and any running program is stopped
     """
 
-    def __init__(self, host, use_rt=False):
+    def __init__(self, host, use_rt=False, urFirm=None):
         self.logger = logging.getLogger("urx")
         self.host = host
+        self.urFirm = urFirm
         self.csys = None
 
         self.logger.debug("Opening secondary monitor socket")
@@ -103,6 +104,56 @@ class URRobot(object):
         for i in tcpf:
             force += i**2
         return force**0.5
+
+    def get_joint_temperature(self, wait=True):
+        """
+        return measured joint temperature
+        if wait==True, waits for next packet before returning
+        """
+        return self.rtmon.getJOINTTemperature(wait)
+    
+    def get_joint_voltage(self, wait=True):
+        """
+        return measured joint voltage
+        if wait==True, waits for next packet before returning
+        """
+        return self.rtmon.getJOINTVoltage(wait)
+    
+    def get_joint_current(self, wait=True):
+        """
+        return measured joint current
+        if wait==True, waits for next packet before returning
+        """
+        return self.rtmon.getJOINTCurrent(wait)
+    
+    def get_main_voltage(self, wait=True):
+        """
+        return measured Safety Control Board: Main voltage
+        if wait==True, waits for next packet before returning
+        """
+        return self.rtmon.getMAINVoltage(wait)
+
+    def get_robot_voltage(self, wait=True):
+        """
+        return measured Safety Control Board: Robot voltage (48V)
+        if wait==True, waits for next packet before returning
+        """
+        return self.rtmon.getROBOTVoltage(wait)
+
+    def get_robot_current(self, wait=True):
+        """
+        return measured Safety Control Board: Robot current
+        if wait==True, waits for next packet before returning
+        """
+        return self.rtmon.getROBOTCurrent(wait)
+
+    def get_all_rt_data(self, wait=True):
+        """
+        return all data parsed from robot real-time interace as a dict
+        if wait==True, waits for next packet before returning
+        """
+        return self.rtmon.getALLData(wait)
+
 
     def set_tcp(self, tcp):
         """
@@ -263,7 +314,7 @@ class URRobot(object):
         vels = [round(i, self.max_float_length) for i in velocities]
         vels.append(acc)
         vels.append(min_time)
-        prog = "{}([{},{},{},{},{},{}], a={}, t_min={})".format(command, *vels)
+        prog = "{}([{},{},{},{},{},{}], {}, {})".format(command, *vels)
         self.send_program(prog)
 
     def movej(self, joints, acc=0.1, vel=0.05, wait=True, relative=False, threshold=None):
@@ -296,6 +347,28 @@ class URRobot(object):
         Send a servoc command to the robot. See URScript documentation.
         """
         return self.movex("servoc", tpose, acc=acc, vel=vel, wait=wait, relative=relative, threshold=threshold)
+
+    def servoj(self, tjoints, acc=0.01, vel=0.01, t=0.1, lookahead_time=0.2, gain=100, wait=True, relative=False, threshold=None):
+        """
+        Send a servoj command to the robot. See URScript documentation.
+        """
+        if relative:
+            l = self.getj()
+            tjoints = [v + l[i] for i, v in enumerate(tjoints)]
+        prog = self._format_servo("servoj", tjoints, acc=acc, vel=vel, t=t, lookahead_time=lookahead_time, gain=gain)
+        self.send_program(prog)
+        if wait:
+            self._wait_for_move(tjoints[:6], threshold=threshold, joints=True)
+            return self.getj()
+
+    def _format_servo(self, command, tjoints, acc=0.01, vel=0.01, t=0.1, lookahead_time=0.2, gain=100, prefix=""):
+        tjoints = [round(i, self.max_float_length) for i in tjoints]
+        tjoints.append(acc)
+        tjoints.append(vel)
+        tjoints.append(t)
+        tjoints.append(lookahead_time)
+        tjoints.append(gain)
+        return "{}({}[{},{},{},{},{},{}], a={}, v={}, t={}, lookahead_time={}, gain={})".format(command, prefix, *tjoints)
 
     def _format_move(self, command, tpose, acc, vel, radius=0, prefix=""):
         tpose = [round(i, self.max_float_length) for i in tpose]
@@ -461,7 +534,7 @@ class URRobot(object):
         """
         if not self.rtmon:
             self.logger.info("Opening real-time monitor socket")
-            self.rtmon = urrtmon.URRTMonitor(self.host)  # som information is only available on rt interface
+            self.rtmon = urrtmon.URRTMonitor(self.host, self.urFirm)  # som information is only available on rt interface
             self.rtmon.start()
         self.rtmon.set_csys(self.csys)
         return self.rtmon
